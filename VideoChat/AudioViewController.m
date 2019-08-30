@@ -19,7 +19,10 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     // Do any additional setup after loading the view.
+    self.view.backgroundColor = [UIColor whiteColor];
+    self.title = @"音频编码";
     
+    [self createRecoder];
 }
 
 -(void)createRecoder {
@@ -33,7 +36,7 @@
 
 #pragma mark -- AudioCaptureDelegate
 - (void)captureOutput:(AudioCapture*)audioCapture audioData:(NSData*)audioData{
-    
+    NSLog(@"采集数据");
     [_audioEncoder encodeAudioData:audioData timeStamp:0];
 }
 

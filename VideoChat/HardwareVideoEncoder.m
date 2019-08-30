@@ -78,8 +78,8 @@
     
     //
     OSStatus status = VTCompressionSessionCreate(NULL, width, height, kCMVideoCodecType_H264, NULL, NULL, NULL, VideoCompressonOutputCallback, (__bridge void*)self, &compressionSession);
-    if (status != 0)
-    {
+    if (status != noErr) {
+        //硬编码session创建失败
         NSLog(@"Error by VTCompressionSessionCreate ");
         return ;
     }
@@ -87,26 +87,43 @@
     videoFrameRate = 24;//帧率
     videoMaxKeyframeInterval = 48;//最大关键帧间隔
     
+    // 关键帧最大间隔，关键帧也就是I帧。
     VTSessionSetProperty(compressionSession, kVTCompressionPropertyKey_MaxKeyFrameInterval, (__bridge CFTypeRef)@(videoMaxKeyframeInterval));
     VTSessionSetProperty(compressionSession, kVTCompressionPropertyKey_MaxKeyFrameIntervalDuration, (__bridge CFTypeRef)@(videoMaxKeyframeInterval/videoFrameRate));
+    
+    //设置帧率
     VTSessionSetProperty(compressionSession, kVTCompressionPropertyKey_ExpectedFrameRate, (__bridge CFTypeRef)@(videoFrameRate));
+    
+    // 设置码率
     VTSessionSetProperty(compressionSession, kVTCompressionPropertyKey_AverageBitRate, (__bridge CFTypeRef)@(videoBitRate));
     NSArray *limit = @[@(videoBitRate * 1.5/8), @(1)];
     VTSessionSetProperty(compressionSession, kVTCompressionPropertyKey_DataRateLimits, (__bridge CFArrayRef)limit);
+    
+    // 设置实时编码
     VTSessionSetProperty(compressionSession, kVTCompressionPropertyKey_RealTime, kCFBooleanTrue);
+    
+    // ProfileLevel，h264的协议等级，不同的清晰度使用不同的ProfileLevel。
     VTSessionSetProperty(compressionSession, kVTCompressionPropertyKey_ProfileLevel, kVTProfileLevel_H264_Main_AutoLevel);
+    
+    // 关闭重排Frame，因为有了B帧（双向预测帧，根据前后的图像计算出本帧）后，编码顺序可能跟显示顺序不同。此参数可以关闭B帧。
     VTSessionSetProperty(compressionSession, kVTCompressionPropertyKey_AllowFrameReordering, kCFBooleanTrue);
     VTSessionSetProperty(compressionSession, kVTCompressionPropertyKey_H264EntropyMode, kVTH264EntropyMode_CABAC);
+    
+    //参数设置完毕，准备开始，至此初始化完成，随时来数据，随时编码
     VTCompressionSessionPrepareToEncodeFrames(compressionSession);
 }
 
 static void VideoCompressonOutputCallback(void *VTref, void *VTFrameRef, OSStatus status, VTEncodeInfoFlags infoFlags, CMSampleBufferRef sampleBuffer){
+    
     if (!sampleBuffer) return;
+    if (!CMSampleBufferDataIsReady(sampleBuffer)) {
+        return;
+    }
     CFArrayRef array = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, true);
     if (!array) return;
     CFDictionaryRef dic = (CFDictionaryRef)CFArrayGetValueAtIndex(array, 0);
     if (!dic) return;
-    
+    //是否是关键帧，关键帧和非关键帧要区分清楚。推流时也要注明。
     BOOL keyframe = !CFDictionaryContainsKey(dic, kCMSampleAttachmentKey_NotSync);
     uint64_t timeStamp = [((__bridge_transfer NSNumber *)VTFrameRef) longLongValue];
     
@@ -132,7 +149,7 @@ static void VideoCompressonOutputCallback(void *VTref, void *VTFrameRef, OSStatu
         }
     }
     
-    
+    //获取真正的视频帧数据
     CMBlockBufferRef dataBuffer = CMSampleBufferGetDataBuffer(sampleBuffer);
     size_t length, totalLength;
     char *dataPointer;
@@ -140,6 +157,7 @@ static void VideoCompressonOutputCallback(void *VTref, void *VTFrameRef, OSStatu
     if (statusCodeRet == noErr) {
         size_t bufferOffset = 0;
         static const int AVCCHeaderLength = 4;
+        //一般情况下都是只有1帧，在最开始编码的时候有2帧，取最后一帧
         while (bufferOffset < totalLength - AVCCHeaderLength) {
             uint32_t NALUnitLength = 0;
             memcpy(&NALUnitLength, dataPointer + bufferOffset, AVCCHeaderLength);

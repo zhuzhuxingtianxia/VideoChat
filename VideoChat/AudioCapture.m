@@ -67,7 +67,7 @@
 }
 
 -(void)handleAudioInitializeError {
-    
+    NSLog(@"Audio init error");
 }
 
 -(AudioComponent)getInputAudioComponent {

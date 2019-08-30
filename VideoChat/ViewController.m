@@ -7,6 +7,8 @@
 //
 
 #import "ViewController.h"
+#import "VideoCaptureController.h"
+#import "AudioViewController.h"
 
 @interface ViewController ()
 
@@ -18,6 +20,15 @@
     [super viewDidLoad];
     // Do any additional setup after loading the view, typically from a nib.
     
+}
+- (IBAction)actionClick:(UIButton*)sender {
+    if (sender.tag == 1) {
+        VideoCaptureController *vedeoVC = [VideoCaptureController new];
+        [self.navigationController pushViewController:vedeoVC animated:YES];
+    }else{
+        AudioViewController *audioVC = [AudioViewController new];
+        [self.navigationController pushViewController:audioVC animated:YES];
+    }
 }
 
 @end

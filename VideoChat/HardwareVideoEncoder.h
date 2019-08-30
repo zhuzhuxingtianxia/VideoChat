@@ -28,7 +28,7 @@ NS_ASSUME_NONNULL_BEGIN
 @interface VideoFrame : NSObject
 
 @property(assign)uint64_t timestamp;
-
+//一帧h264数据
 @property(nonatomic,strong)NSData  *data;
 
 @property(nonatomic,strong)NSData *sps;

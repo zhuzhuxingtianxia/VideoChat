@@ -10,7 +10,7 @@
 #import <AVFoundation/AVFoundation.h>
 #import "HardwareVideoEncoder.h"
 
-@interface VideoCaptureController ()<AVCaptureVideoDataOutputSampleBufferDelegate,HardwareVideoEncoderDelegate>
+@interface VideoCaptureController ()<AVCaptureVideoDataOutputSampleBufferDelegate,AVCaptureAudioDataOutputSampleBufferDelegate,HardwareVideoEncoderDelegate>
 {
     HardwareVideoEncoder *_h264Encoder;
 }
@@ -21,6 +21,7 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
+    self.title = @"视频编码";
     // Do any additional setup after loading the view.
     [self startCapture];
     _h264Encoder = [[HardwareVideoEncoder alloc] init];
@@ -29,9 +30,14 @@
 }
 -(void)startCapture {
     AVCaptureSession *captureSession = [[AVCaptureSession alloc] init];
-    [captureSession addInput:[self getInputDevice]];
     
-    AVCaptureVideoDataOutput *outPutDevice = [self getOutPutDevice];
+    AVCaptureDeviceInput *videoInput = [self getVideoInputDevice];
+    if ([captureSession canAddInput:videoInput]) {
+        [captureSession addInput:videoInput];
+    }
+    
+    
+    AVCaptureVideoDataOutput *outPutDevice = [self getVideoOutPutDevice];
     [captureSession addOutput:outPutDevice];
     
     [captureSession beginConfiguration];
@@ -45,7 +51,7 @@
     previewLayer.frame = self.view.bounds;
     [captureSession startRunning];
 }
--(AVCaptureDeviceInput *)getInputDevice {
+-(AVCaptureDeviceInput *)getVideoInputDevice {
     NSError *deviceError;
     AVCaptureDeviceInput *inputDevice;
     
@@ -68,8 +74,16 @@
     
 }
 
--(AVCaptureVideoDataOutput *)getOutPutDevice {
+-(AVCaptureDeviceInput *)getAudioInputDevice{
+    AVCaptureDevice *audioDevice = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeAudio];
+    AVCaptureDeviceInput *audioInputDevice = [AVCaptureDeviceInput deviceInputWithDevice:audioDevice error:nil];
+    return audioInputDevice;
+}
+
+-(AVCaptureVideoDataOutput *)getVideoOutPutDevice {
     AVCaptureVideoDataOutput *outPutDevice = [[AVCaptureVideoDataOutput alloc] init];
+    
+    //设置输出格式为 yuv420
     NSString *keyPixel = (NSString *)kCVPixelBufferPixelFormatTypeKey;
     NSNumber *pixelFormatType = [NSNumber numberWithUnsignedInt:kCVPixelFormatType_420YpCbCr8BiPlanarFullRange];
     
@@ -81,9 +95,21 @@
     return outPutDevice;
 }
 
+-(AVCaptureAudioDataOutput *)getAudioOutputDevice {
+    //创建数据获取线程
+    dispatch_queue_t captureQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    //音频数据输出
+    AVCaptureAudioDataOutput *audioDataOutput = [[AVCaptureAudioDataOutput alloc] init];
+    //设置代理，需要当前类实现protocol：AVCaptureAudioDataOutputSampleBufferDelegate
+    [audioDataOutput setSampleBufferDelegate:self queue:captureQueue];
+    
+    return audioDataOutput;
+}
+
 #pragma mark -- AVCaptureVideoDataOutputSampleBufferDelegate
 - (void)captureOutput:(AVCaptureOutput *)output didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer fromConnection:(AVCaptureConnection *)connection {
-    CVImageBufferRef imageBuffer = (CVImageBufferRef)CMSampleBufferGetImageBuffer(sampleBuffer);
+    // 这里面就包含了yuv420(NV12)数据的指针
+    CVImageBufferRef imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
     
     [_h264Encoder encodeVideoData:imageBuffer timeStamp:0];
     NSLog(@"输出:%@",imageBuffer);
@@ -125,6 +151,10 @@
      
      [videoCamera startCameraCapture];
      */
+}
+
+-(void)dealloc {
+    NSLog(@"走啊走");
 }
 
 @end
