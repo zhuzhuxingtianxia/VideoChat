@@ -154,7 +154,7 @@
 }
 
 -(void)dealloc {
-    NSLog(@"走啊走");
+    NSLog(@"%p",__func__);
 }
 
 @end
